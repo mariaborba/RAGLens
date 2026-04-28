@@ -173,3 +173,14 @@ O fluxo típico de uso:
 3. Analisar quais chunks foram recuperados e com qual score
 4. Ajustar o tamanho dos chunks, a base documental ou o prompt do sistema
 5. Repetir até que os chunks recuperados sejam consistentemente relevantes
+
+---
+
+## Status e próximos passos
+
+O projeto está funcional e em uso ativo como ferramenta de suporte ao desenvolvimento do PACEF.
+
+Melhorias planejadas:
+
+- **Testes em lote:** executar múltiplas queries de uma vez e comparar os resultados agregados, permitindo avaliar o comportamento do pipeline em cenários variados sem rodar uma query por vez
+- **Análise de lacunas pelo histórico:** identificar automaticamente, a partir das queries com baixos scores de similaridade, quais temas recorrentes não estão sendo cobertos pelos documentos atuais — sinalizando onde a base documental precisa ser expandida
