@@ -1,0 +1,19 @@
+# API e HTTP
+httpx>=0.27.0
+
+# Extração de PDF
+pypdf>=4.0.0
+
+# Álgebra linear (cosine similarity)
+numpy>=1.26.0
+
+# Servidor web
+fastapi>=0.111.0
+uvicorn[standard]>=0.29.0
+python-multipart>=0.0.9
+
+# Banco de dados
+aiosqlite>=0.20.0
+
+# Variáveis de ambiente
+python-dotenv>=1.0.0

@@ -1,0 +1,22 @@
+# Ambiente virtual
+venv/
+.venv/
+
+# Variáveis de ambiente
+.env
+
+# Banco de dados local
+*.db
+
+# PDFs da base de conhecimento (arquivos grandes)
+rag/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# IDEs
+.vscode/
+.cursor/
+.idea/

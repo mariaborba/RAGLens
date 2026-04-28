@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RAG Debugger</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #f5f5f7;
+      --surface: #fff;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --muted: #6b6b6b;
+      --accent: #4f46e5;
+      --accent-h: #4338ca;
+      --green: #16a34a;
+      --yellow: #ca8a04;
+      --red: #dc2626;
+      --radius: 10px;
+      --shadow: 0 1px 4px rgba(0,0,0,.08);
+    }
+
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+
+    header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 28px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 1.1rem; font-weight: 600; }
+    .pill { font-size: .78rem; padding: 2px 8px; border-radius: 20px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+    .pill.green { background:#dcfce7; border-color:#86efac; color:var(--green); }
+    .pill.yellow { background:#fef9c3; border-color:#fde047; color:var(--yellow); }
+
+    nav { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 28px; display: flex; gap: 0; }
+    .tab { padding: 10px 18px; font-size: .85rem; font-weight: 500; color: var(--muted); cursor: pointer; border-bottom: 2px solid transparent; transition: all .15s; user-select: none; }
+    .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+    .tab:hover:not(.active) { color: var(--text); }
+
+    .page { display: none; padding: 24px 28px; max-width: 1100px; margin: 0 auto; }
+    .page.active { display: block; }
+
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+    .card + .card { margin-top: 16px; }
+    .card-title { font-size: .78rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin-bottom: 14px; }
+
+    label { font-size: .82rem; font-weight: 500; display: block; margin-bottom: 5px; margin-top: 12px; }
+    label:first-of-type { margin-top: 0; }
+
+    input[type=text], input[type=number], textarea, select {
+      width: 100%; padding: 9px 11px; border: 1px solid var(--border); border-radius: 7px;
+      font-size: .88rem; font-family: inherit; background: var(--bg); color: var(--text);
+      transition: border-color .15s; resize: vertical;
+    }
+    input[type=text]:focus, input[type=number]:focus, textarea:focus, select:focus {
+      outline: none; border-color: var(--accent); background: #fff;
+    }
+
+    .row { display: flex; gap: 12px; }
+    .row > * { flex: 1; }
+
+    button { padding: 9px 18px; border-radius: 7px; font-size: .88rem; font-weight: 500; cursor: pointer; border: none; transition: background .15s; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-primary:hover { background: var(--accent-h); }
+    .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-secondary { background: var(--bg); border: 1px solid var(--border); color: var(--text); }
+    .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+    .btn-danger { background: #fee2e2; border: 1px solid #fca5a5; color: var(--red); }
+    .btn-danger:hover { background: #fecaca; }
+    .btn-full { width: 100%; margin-top: 12px; padding: 11px; }
+
+    /* ── Drop zone ── */
+    .dropzone {
+      border: 2px dashed var(--border); border-radius: var(--radius); padding: 32px;
+      text-align: center; cursor: pointer; transition: all .2s; background: var(--bg);
+      margin-top: 8px;
+    }
+    .dropzone:hover, .dropzone.drag { border-color: var(--accent); background: #eef2ff; }
+    .dropzone p { font-size: .85rem; color: var(--muted); margin-top: 6px; }
+    .dropzone strong { color: var(--text); }
+    .dropzone input[type=file] { display: none; }
+
+    /* ── PDF list ── */
+    .pdf-list { list-style: none; margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .pdf-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: 7px; font-size: .82rem; }
+    .pdf-name { font-weight: 500; }
+    .pdf-size { color: var(--muted); }
+
+    /* ── Sources table ── */
+    .sources { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .source-row { display: flex; align-items: center; gap: 10px; }
+    .source-name { font-size: .83rem; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .source-bar-bg { flex: 2; height: 6px; background: var(--border); border-radius: 3px; }
+    .source-bar-fill { height: 6px; background: var(--accent); border-radius: 3px; }
+    .source-count { font-size: .78rem; color: var(--muted); width: 60px; text-align: right; }
+
+    /* ── Chunk cards ── */
+    .chunks-grid { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .chunk { border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; background: var(--surface); }
+    .chunk-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--bg); border-bottom: 1px solid var(--border); }
+    .rank { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-size: .75rem; font-weight: 700; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .chunk-meta { flex: 1; min-width: 0; }
+    .chunk-source { font-size: .78rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chunk-why { font-size: .73rem; color: var(--muted); margin-top: 1px; }
+    .score-badge { font-size: .8rem; font-weight: 700; padding: 3px 8px; border-radius: 20px; flex-shrink: 0; }
+    .score-high { background:#dcfce7; color:var(--green); }
+    .score-mid  { background:#fef9c3; color:var(--yellow); }
+    .score-low  { background:#fee2e2; color:var(--red); }
+    .score-bar-wrap { padding: 0 14px 4px; }
+    .score-bar-bg { height: 4px; background: var(--bg); border-radius: 2px; margin-top: 8px; }
+    .score-bar-fill { height: 4px; border-radius: 2px; }
+    .fill-high { background: var(--green); } .fill-mid { background: var(--yellow); } .fill-low { background: var(--red); }
+    .chunk-text { padding: 12px 14px; font-size: .83rem; line-height: 1.55; }
+    .chunk-text.collapsed { max-height: 72px; overflow: hidden; position: relative; }
+    .chunk-text.collapsed::after { content:''; position:absolute; bottom:0; left:0; right:0; height:28px; background:linear-gradient(transparent,var(--surface)); }
+    .toggle-text { font-size: .75rem; color: var(--accent); cursor: pointer; padding: 0 14px 10px; display: block; }
+    .toggle-text:hover { text-decoration: underline; }
+
+    /* ── Response ── */
+    .response-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+    .response-meta { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .tag { font-size: .73rem; padding: 2px 8px; border-radius: 20px; background: var(--bg); border: 1px solid var(--border); color: var(--muted); }
+    .response-text { font-size: .9rem; line-height: 1.65; white-space: pre-wrap; }
+
+    /* ── History ── */
+    .history-list { display: flex; flex-direction: column; gap: 10px; }
+    .history-item { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; cursor: pointer; transition: border-color .15s; }
+    .history-item:hover { border-color: var(--accent); }
+    .history-header { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+    .history-query { font-size: .88rem; font-weight: 500; }
+    .history-time { font-size: .75rem; color: var(--muted); white-space: nowrap; }
+    .history-tags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .history-detail { display: none; margin-top: 14px; border-top: 1px solid var(--border); padding-top: 14px; }
+    .history-detail.open { display: block; }
+
+    /* ── Layout debug ── */
+    .debug-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .debug-results { grid-column: 1 / -1; display: none; }
+    .debug-results.visible { display: block; }
+    @media (max-width: 800px) { .debug-layout { grid-template-columns: 1fr; } }
+
+    /* ── Misc ── */
+    .spinner { display: inline-block; width: 15px; height: 15px; border: 2px solid #fff4; border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .empty { text-align: center; color: var(--muted); padding: 40px 0; font-size: .88rem; }
+    .alert { border-radius: 7px; padding: 10px 14px; font-size: .83rem; margin-top: 10px; }
+    .alert-error { background: #fee2e2; color: #b91c1c; }
+    .alert-success { background: #dcfce7; color: #15803d; }
+    .alert-info { background: #e0e7ff; color: #3730a3; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>RAG Debugger</h1>
+  <span id="chunks-pill" class="pill">0 chunks</span>
+</header>
+
+<nav>
+  <div class="tab active" onclick="switchTab('docs')">Documentos</div>
+  <div class="tab" onclick="switchTab('debug')">Debug</div>
+  <div class="tab" onclick="switchTab('history')">Histórico</div>
+</nav>
+
+<!-- ══════════════════════════════════════════════════════════
+     DOCUMENTOS
+═══════════════════════════════════════════════════════════════ -->
+<div id="page-docs" class="page active">
+
+  <!-- Configurações de chunking -->
+  <div class="card">
+    <div class="card-title">Configurações de chunking</div>
+    <div class="row">
+      <div>
+        <label>Tamanho do chunk (palavras)</label>
+        <input type="number" id="chunk-words" value="400" min="50" max="2000" />
+      </div>
+      <div>
+        <label>Overlap entre chunks (palavras)</label>
+        <input type="number" id="overlap-words" value="80" min="0" max="400" />
+      </div>
+      <div>
+        <label>Top-K na recuperação</label>
+        <input type="number" id="topk-docs" value="3" min="1" max="10" />
+      </div>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:16px; align-items:flex-start">
+
+    <!-- Fonte 1 — Pasta do servidor -->
+    <div class="card">
+      <div class="card-title">Pasta no servidor</div>
+      <label>Caminho da pasta</label>
+      <input type="text" id="rag-folder" value="rag" placeholder="rag  ou  /caminho/absoluto" />
+      <button class="btn-secondary" style="margin-top:8px;width:100%;font-size:.82rem" onclick="previewFolder()">Verificar pasta</button>
+      <ul class="pdf-list" id="folder-pdf-list"></ul>
+      <div id="folder-msg"></div>
+      <button class="btn-primary btn-full" id="ingest-folder-btn" onclick="ingestFolder()">Ingerir PDFs da pasta</button>
+    </div>
+
+    <!-- Fonte 2 — Upload -->
+    <div class="card">
+      <div class="card-title">Upload de PDFs</div>
+      <div class="dropzone" id="dropzone" onclick="document.getElementById('file-input').click()"
+           ondragover="event.preventDefault();this.classList.add('drag')"
+           ondragleave="this.classList.remove('drag')"
+           ondrop="handleDrop(event)">
+        <div style="font-size:2rem">📄</div>
+        <strong>Clique ou arraste PDFs aqui</strong>
+        <p>Aceita múltiplos arquivos</p>
+        <input type="file" id="file-input" accept=".pdf" multiple onchange="handleFileSelect(event)" />
+      </div>
+      <ul class="pdf-list" id="upload-pdf-list"></ul>
+      <div id="upload-msg"></div>
+      <button class="btn-primary btn-full" id="upload-btn" onclick="uploadFiles()" style="display:none">Processar PDFs selecionados</button>
+    </div>
+
+  </div>
+
+  <!-- Base atual -->
+  <div class="card" style="margin-top:16px">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px">
+      <div class="card-title" style="margin-bottom:0">Base de conhecimento atual</div>
+      <button class="btn-danger" style="font-size:.78rem;padding:5px 12px" onclick="clearDocs()">Limpar tudo</button>
+    </div>
+    <div id="docs-summary"><p class="empty" style="padding:16px 0">Nenhum documento ingerido.</p></div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     DEBUG
+═══════════════════════════════════════════════════════════════ -->
+<div id="page-debug" class="page">
+  <div class="debug-layout">
+
+    <!-- Painel esquerdo -->
+    <div class="card">
+      <div class="card-title">Query</div>
+      <label>Pergunta</label>
+      <input type="text" id="query" placeholder="Ex: Qual o escore usado para avaliar o bebê ao nascer?" />
+
+      <div class="row" style="margin-top:12px">
+        <div>
+          <label>Top-K</label>
+          <input type="number" id="topk-debug" value="3" min="1" max="10" />
+        </div>
+        <div>
+          <label>Modelo LLM</label>
+          <select id="llm-model">
+            <option value="sabia-3">Sabiá 3</option>
+            <option value="sabia-3.1">Sabiá 3.1</option>
+            <option value="sabia-4">Sabiá 4</option>
+            <option value="sabiazinho-3">Sabiázinho 3</option>
+            <option value="sabiazinho-4">Sabiázinho 4</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="base-status" class="alert alert-info" style="margin-top:12px;display:none"></div>
+      <div id="debug-error" class="alert alert-error" style="display:none"></div>
+      <button class="btn-primary btn-full" id="run-btn" onclick="runDebug()">Executar  <kbd style="opacity:.6;font-size:.75rem">Ctrl+↵</kbd></button>
+    </div>
+
+    <!-- Score chart -->
+    <div class="card">
+      <div class="card-title">Distribuição de scores</div>
+      <canvas id="score-chart" height="200" style="width:100%;display:none"></canvas>
+      <p id="chart-empty" class="empty" style="padding:60px 0">Execute uma query para ver os scores.</p>
+    </div>
+
+    <!-- Resultados -->
+    <div class="debug-results" id="results-section">
+      <div class="chunks-grid" id="chunks-container"></div>
+      <div class="response-card">
+        <div class="card-title">Resposta do LLM</div>
+        <div class="response-meta" id="response-meta"></div>
+        <div class="response-text" id="response-text"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════
+     HISTÓRICO
+═══════════════════════════════════════════════════════════════ -->
+<div id="page-history" class="page">
+  <div style="display:flex; gap:10px; align-items:center; margin-bottom:16px">
+    <span style="font-size:.85rem;font-weight:500">Últimas</span>
+    <input type="number" id="history-n" value="10" style="width:64px;text-align:center" />
+    <button class="btn-secondary" style="font-size:.82rem;padding:7px 14px" onclick="loadHistory()">Carregar</button>
+    <button class="btn-danger" style="font-size:.78rem;padding:7px 12px" onclick="clearHistory()">Limpar histórico</button>
+  </div>
+  <div class="history-list" id="history-list">
+    <p class="empty">Carregando...</p>
+  </div>
+</div>
+
+<script>
+// ── Estado local ──────────────────────────────────────────────────────────────
+let _pendingFiles = [];
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) =>
+    t.classList.toggle('active', ['docs','debug','history'][i] === name));
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(`page-${name}`).classList.add('active');
+  if (name === 'debug') refreshBaseStatus();
+  if (name === 'history') loadHistory();
+}
+
+// ── Utilitários ───────────────────────────────────────────────────────────────
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function scoreClass(s) { return s >= .75 ? 'high' : s >= .50 ? 'mid' : 'low'; }
+function fmtTime(iso) { return new Date(iso).toLocaleString('pt-BR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}); }
+function fmtSize(bytes) { return bytes < 1024*1024 ? (bytes/1024).toFixed(0)+' KB' : (bytes/1024/1024).toFixed(1)+' MB'; }
+
+function setMsg(id, text, type='info') {
+  const el = document.getElementById(id);
+  if (!text) { el.innerHTML = ''; return; }
+  el.innerHTML = `<div class="alert alert-${type}" style="margin-top:8px">${esc(text)}</div>`;
+}
+
+// ── Chunks pill (header) ──────────────────────────────────────────────────────
+async function refreshPill() {
+  try {
+    const r = await fetch('/documents');
+    const d = await r.json();
+    const pill = document.getElementById('chunks-pill');
+    pill.textContent = `${d.total_chunks} chunks`;
+    pill.className = `pill ${d.total_chunks > 0 ? 'green' : ''}`;
+    renderDocsSummary(d);
+  } catch {}
+}
+
+function renderDocsSummary(d) {
+  const el = document.getElementById('docs-summary');
+  if (!d.total_chunks) {
+    el.innerHTML = '<p class="empty" style="padding:16px 0">Nenhum documento ingerido.</p>';
+    return;
+  }
+  const maxChunks = Math.max(...Object.values(d.sources));
+  const rows = Object.entries(d.sources).map(([src, n]) => `
+    <div class="source-row">
+      <div class="source-name" title="${esc(src)}">${esc(src)}</div>
+      <div class="source-bar-bg"><div class="source-bar-fill" style="width:${(n/maxChunks*100).toFixed(0)}%"></div></div>
+      <div class="source-count">${n} chunks</div>
+    </div>`).join('');
+  el.innerHTML = `
+    <div style="font-size:.83rem;color:var(--muted);margin-bottom:10px">
+      <strong>${d.total_chunks}</strong> chunks de <strong>${Object.keys(d.sources).length}</strong> fonte(s)
+    </div>
+    <div class="sources">${rows}</div>`;
+}
+
+// ── Pasta do servidor ─────────────────────────────────────────────────────────
+async function previewFolder() {
+  const folder = document.getElementById('rag-folder').value.trim();
+  setMsg('folder-msg', '');
+  document.getElementById('folder-pdf-list').innerHTML = '';
+  // Não temos endpoint de preview — tentamos ingerir com dry-run via listagem futura.
+  // Por ora, mostramos feedback depois do ingest.
+  setMsg('folder-msg', `Clique em "Ingerir" para processar a pasta "${folder}".`, 'info');
+}
+
+async function ingestFolder() {
+  const folder = document.getElementById('rag-folder').value.trim();
+  const chunk_words   = parseInt(document.getElementById('chunk-words').value) || 400;
+  const overlap_words = parseInt(document.getElementById('overlap-words').value) || 80;
+  const btn = document.getElementById('ingest-folder-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Ingerindo...';
+  setMsg('folder-msg', '');
+
+  try {
+    const r = await fetch('/ingest/folder', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ folder, chunk_words, overlap_words }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+
+    let msg = `${d.files_ok} PDF(s) processados · ${d.chunks_added} chunks adicionados · total: ${d.total_chunks}`;
+    if (d.files_skipped) msg += ` · ${d.files_skipped} já ingerido(s)`;
+    if (d.files_error)   msg += ` · ⚠️ ${d.files_error} erro(s)`;
+    setMsg('folder-msg', msg, d.files_ok > 0 ? 'success' : 'error');
+    await refreshPill();
+  } catch(e) {
+    setMsg('folder-msg', e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Ingerir PDFs da pasta';
+  }
+}
+
+// ── Upload de PDFs ────────────────────────────────────────────────────────────
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('drag');
+  addFiles([...e.dataTransfer.files].filter(f => f.name.toLowerCase().endsWith('.pdf')));
+}
+
+function handleFileSelect(e) { addFiles([...e.target.files]); }
+
+function addFiles(files) {
+  _pendingFiles = [..._pendingFiles, ...files];
+  renderPendingFiles();
+}
+
+function renderPendingFiles() {
+  const list = document.getElementById('upload-pdf-list');
+  const btn  = document.getElementById('upload-btn');
+  if (!_pendingFiles.length) { list.innerHTML = ''; btn.style.display = 'none'; return; }
+  btn.style.display = '';
+  list.innerHTML = _pendingFiles.map((f,i) => `
+    <li class="pdf-item">
+      <span class="pdf-name">📄 ${esc(f.name)}</span>
+      <span style="display:flex;gap:8px;align-items:center">
+        <span class="pdf-size">${fmtSize(f.size)}</span>
+        <span style="cursor:pointer;color:var(--red);font-size:.8rem" onclick="removeFile(${i})">✕</span>
+      </span>
+    </li>`).join('');
+}
+
+function removeFile(i) { _pendingFiles.splice(i,1); renderPendingFiles(); }
+
+async function uploadFiles() {
+  if (!_pendingFiles.length) return;
+  const chunk_words   = parseInt(document.getElementById('chunk-words').value) || 400;
+  const overlap_words = parseInt(document.getElementById('overlap-words').value) || 80;
+  const btn = document.getElementById('upload-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Processando...';
+  setMsg('upload-msg', '');
+
+  try {
+    const fd = new FormData();
+    _pendingFiles.forEach(f => fd.append('files', f));
+    fd.append('chunk_words',   chunk_words);
+    fd.append('overlap_words', overlap_words);
+
+    const r = await fetch('/ingest/upload', { method: 'POST', body: fd });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+
+    const ok    = d.files.filter(f => !f.error);
+    const erros = d.files.filter(f => f.error);
+    let msg = `${ok.length} PDF(s) processados · ${d.chunks_added} chunks · total: ${d.total_chunks}`;
+    if (erros.length) msg += ` · ⚠️ erros: ${erros.map(f=>f.file).join(', ')}`;
+    setMsg('upload-msg', msg, ok.length > 0 ? 'success' : 'error');
+    _pendingFiles = [];
+    renderPendingFiles();
+    await refreshPill();
+  } catch(e) {
+    setMsg('upload-msg', e.message, 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Processar PDFs selecionados';
+  }
+}
+
+async function clearDocs() {
+  if (!confirm('Apagar todos os chunks da base?')) return;
+  const r = await fetch('/documents', { method: 'DELETE' });
+  const d = await r.json();
+  setMsg('folder-msg', `${d.deleted_chunks} chunks removidos.`, 'info');
+  await refreshPill();
+}
+
+// ── Debug ─────────────────────────────────────────────────────────────────────
+async function refreshBaseStatus() {
+  try {
+    const r = await fetch('/documents');
+    const d = await r.json();
+    const el = document.getElementById('base-status');
+    if (d.total_chunks > 0) {
+      el.className = 'alert alert-success';
+      el.textContent = `✅ Base com ${d.total_chunks} chunks de ${Object.keys(d.sources).length} fonte(s)`;
+    } else {
+      el.className = 'alert alert-error';
+      el.textContent = '⚠️ Base vazia — ingira documentos na aba Documentos primeiro.';
+    }
+    el.style.display = '';
+  } catch {}
+}
+
+async function runDebug() {
+  const query = document.getElementById('query').value.trim();
+  const topk  = parseInt(document.getElementById('topk-debug').value) || 3;
+  const llm   = document.getElementById('llm-model').value;
+  const errEl = document.getElementById('debug-error');
+  errEl.style.display = 'none';
+
+  if (!query) { errEl.textContent = 'Digite uma query.'; errEl.style.display = ''; return; }
+
+  const btn = document.getElementById('run-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span>Executando...';
+
+  try {
+    const r = await fetch('/debug', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ query, top_k: topk, llm_model: llm }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || `HTTP ${r.status}`);
+    renderResults(d);
+  } catch(e) {
+    errEl.textContent = e.message;
+    errEl.style.display = '';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Executar  <kbd style="opacity:.6;font-size:.75rem">Ctrl+↵</kbd>';
+  }
+}
+
+function renderResults(data) {
+  document.getElementById('results-section').classList.add('visible');
+  document.getElementById('chunks-container').innerHTML = data.chunks.map(renderChunk).join('');
+  document.getElementById('response-meta').innerHTML = `
+    <span class="tag">⏱ ${data.elapsed_ms.toFixed(0)} ms</span>
+    <span class="tag">${data.llm_model.split('/').pop()}</span>
+    <span class="tag">${data.embedding_model.split('/').pop()}</span>
+    <span class="tag">${data.chunks.length}/${data.total_chunks_in_base} chunks</span>`;
+  document.getElementById('response-text').textContent = data.response;
+  drawChart(data.all_scores);
+  document.getElementById('results-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Chunk card ────────────────────────────────────────────────────────────────
+function renderChunk(c) {
+  const cls = scoreClass(c.score);
+  const pct = (c.score * 100).toFixed(1);
+  const id  = `ct-${c.rank}-${Date.now()}`;
+  return `
+    <div class="chunk">
+      <div class="chunk-header">
+        <div class="rank">${c.rank}</div>
+        <div class="chunk-meta">
+          <div class="chunk-source">${esc(c.source || 'sem fonte')}</div>
+          <div class="chunk-why">${esc(c.why)}</div>
+        </div>
+        <div class="score-badge score-${cls}">${pct}%</div>
+      </div>
+      <div class="score-bar-wrap">
+        <div class="score-bar-bg"><div class="score-bar-fill fill-${cls}" style="width:${pct}%"></div></div>
+      </div>
+      <div class="chunk-text collapsed" id="${id}">${esc(c.text)}</div>
+      <span class="toggle-text" onclick="toggleChunk('${id}',this)">Mostrar mais</span>
+    </div>`;
+}
+
+function toggleChunk(id, el) {
+  const div = document.getElementById(id);
+  div.classList.toggle('collapsed');
+  el.textContent = div.classList.contains('collapsed') ? 'Mostrar mais' : 'Mostrar menos';
+}
+
+// ── Score chart ───────────────────────────────────────────────────────────────
+function drawChart(scores) {
+  const canvas = document.getElementById('score-chart');
+  const empty  = document.getElementById('chart-empty');
+  if (!scores?.length) { empty.style.display=''; canvas.style.display='none'; return; }
+  empty.style.display = 'none'; canvas.style.display = '';
+  const W = canvas.offsetWidth, H = 200;
+  canvas.width = W; canvas.height = H;
+  const p = { t:16, r:16, b:32, l:36 };
+  const iW = W-p.l-p.r, iH = H-p.t-p.b;
+  const bW = Math.min(40, iW/scores.length - 6);
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  [.25,.5,.75,1].forEach(v => {
+    const y = p.t + iH*(1-v);
+    ctx.strokeStyle='#e0e0e0'; ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(p.l,y); ctx.lineTo(W-p.r,y); ctx.stroke();
+    ctx.fillStyle='#9ca3af'; ctx.font='10px sans-serif'; ctx.textAlign='right';
+    ctx.fillText((v*100).toFixed(0)+'%', p.l-4, y+4);
+  });
+  scores.forEach((s,i) => {
+    const x  = p.l + (i/scores.length)*iW + (iW/scores.length - bW)/2;
+    const bH = iH*s, y = p.t+iH-bH;
+    const cls = scoreClass(s);
+    ctx.fillStyle = cls==='high'?'#16a34a':cls==='mid'?'#ca8a04':'#dc2626';
+    ctx.beginPath(); ctx.roundRect(x,y,bW,bH,3); ctx.fill();
+    ctx.fillStyle='#6b6b6b'; ctx.font='9px sans-serif'; ctx.textAlign='center';
+    ctx.fillText(`#${i+1}`, x+bW/2, H-p.b+12);
+  });
+}
+
+// ── Histórico ─────────────────────────────────────────────────────────────────
+async function loadHistory() {
+  const n = parseInt(document.getElementById('history-n').value) || 10;
+  const list = document.getElementById('history-list');
+  list.innerHTML = '<p class="empty">Carregando...</p>';
+  try {
+    const r = await fetch(`/history?n=${n}`);
+    const data = await r.json();
+    if (!data.length) { list.innerHTML = '<p class="empty">Nenhuma query ainda.</p>'; return; }
+    list.innerHTML = data.map((item,idx) => `
+      <div class="history-item" onclick="toggleHistory(${idx})">
+        <div class="history-header">
+          <div class="history-query">${esc(item.query)}</div>
+          <div class="history-time">${fmtTime(item.timestamp)}</div>
+        </div>
+        <div class="history-tags">
+          <span class="tag">${item.llm_model.split('/').pop()}</span>
+          <span class="tag">${item.chunks.length} chunks</span>
+          <span class="tag">⏱ ${item.elapsed_ms.toFixed(0)} ms</span>
+          ${item.chunks[0] ? `<span class="score-badge score-${scoreClass(item.chunks[0].score)}" style="font-size:.73rem;padding:2px 7px">${(item.chunks[0].score*100).toFixed(1)}% top</span>` : ''}
+        </div>
+        <div class="history-detail" id="hd-${idx}">
+          ${item.chunks.map(renderChunk).join('')}
+          <div style="margin-top:14px;padding:14px;background:var(--bg);border-radius:8px;font-size:.85rem;line-height:1.6;white-space:pre-wrap">${esc(item.response)}</div>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = `<p class="empty">Erro: ${e.message}</p>`;
+  }
+}
+
+function toggleHistory(idx) { document.getElementById(`hd-${idx}`).classList.toggle('open'); }
+
+async function clearHistory() {
+  if (!confirm('Apagar todo o histórico?')) return;
+  await fetch('/history', { method: 'DELETE' });
+  loadHistory();
+}
+
+// ── Teclado ───────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => { if ((e.ctrlKey||e.metaKey) && e.key==='Enter') runDebug(); });
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+refreshPill();
+</script>
+</body>
+</html>
