@@ -5,6 +5,8 @@ Ferramenta de inspeção e rastreabilidade para pipelines RAG. Para cada query, 
 Desenvolvido como projeto de pós-graduação integrado ao [Sabiá Tester](../APP_TESTES).
 
 ---
+<img width="964" height="886" alt="image" src="https://github.com/user-attachments/assets/b2140f08-055d-4fa2-97c9-eb94a03416ff" />
+
 
 ## Arquitetura
 
