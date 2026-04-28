@@ -17,3 +17,6 @@ aiosqlite>=0.20.0
 
 # Variáveis de ambiente
 python-dotenv>=1.0.0
+
+# Testes
+pytest>=8.0.0
